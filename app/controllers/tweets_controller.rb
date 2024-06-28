@@ -8,13 +8,21 @@ class TweetsController < ApplicationController
     token = cookies.signed[:twitter_session_token]
     session = Session.find_by(token: token)
     user = session.user
-    @tweet = user.tweets.new(tweet_params)
-
-    if @tweet.save
-      TweetMailer.notify(@tweet).deliver! # invoke TweetMailer to send out the email when a tweet is successfully posted
-      render 'tweets/create'
+    if user.tweets.where('created_at > ?', Time.now - 1.hour).count >= 30
+      return render json: {
+        error: {
+          message: 'You have posted more than 30 tweets in 1 hour. Please try again later.'
+        }
+      }
     end
-  end
+      
+    @tweet = user.tweets.new(tweet_params)
+    
+    if @tweet.save
+    TweetMailer.notify(@tweet).deliver! # invoke TweetMailer to send out the email when a tweet is successfully posted
+      render 'tweets/create', status: 201
+    end
+end
 
   def destroy
     token = cookies.signed[:twitter_session_token]
